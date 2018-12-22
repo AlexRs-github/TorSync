@@ -43,7 +43,7 @@ def create_tb(user, password):
 	#create table rows. Name of backup (char 35), date of creation (char 10), size of backup (int)
 	cursor.execute("""CREATE TABLE IF NOT EXISTS pycryption.backups (
 		TARGET_DIR  CHAR(35),
-		D~
+		DATE  CHAR(10),
 		SIZE  INT
 	)""")
 
