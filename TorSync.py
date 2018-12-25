@@ -164,7 +164,7 @@ elif args.directory and args.compression and args.compression > -1 and args.comp
 	print(gpg_filename)
 	print(type(gpg_filename))
 	#Get the GPG file
-	#insert_tb(args.user, args.password, gpg_filename, currdate, zip_size)
+	#Needed: insert_tb(args.user, args.password, gpg_filename, currdate, zip_size)
 
 	print("Encryption successful!")
 	sys.exit()
