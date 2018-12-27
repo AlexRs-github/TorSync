@@ -12,6 +12,10 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-g","--gpg", action="store_true", help="Download gpg windows installer to cwd")
 
+parser.add_argument("-r","--remove", action="store_true", help="Remove a backup from the database & backups directory")
+parser.add_argument("-t","--date", type=str, help="Supply a backup by date that you want to remove")
+
+parser.add_argument("-a","--add", action="store_true", help="Add a new backup to the database")
 parser.add_argument("-d","--directory", type=str, help="Target directory you want to encrypt & backup")
 parser.add_argument("-c","--compression", type=int, help="Specify the level of compression you want")
 parser.add_argument("-u","--user", type=str, help="Username for MySQL")
@@ -19,38 +23,56 @@ parser.add_argument("-p","--password", type=str, help="Password for MySQL")
 #parser.add_argument("-s", "--size", type=int, help="Change the maximum size of all backups when combined")
 
 args = parser.parse_args()
-print(args.directory)
 
 dir = args.directory
 compression = args.compression
 currdate = "-" + str(datetime.datetime.today().strftime('%Y-%m-%d'))
 
-print(os.getcwd())
-
 #put gnupg download in cwd
 gnupg_dir = (os.getcwd() + ("\gnupg-w32-2.2.11_20181106.exe"))
+dbname = "torsync"
 
 def create_db(user, password):
 	db = pymysql.connect("localhost", user, password)
 	cursor = db.cursor()
 	#create pycryption database
-	cursor.execute("CREATE DATABASE IF NOT EXISTS pycryption")
+	cursor.execute("CREATE DATABASE IF NOT EXISTS " + dbname)
+	db.commit()
+	cursor.close()
 
 def create_tb(user, password):
 	db = pymysql.connect("localhost", user, password)
 	cursor = db.cursor()
 	#create backups table
-	#create table rows. Name of backup (char 35), date of creation (char 10), size of backup (int)
-	cursor.execute("""CREATE TABLE IF NOT EXISTS pycryption.backups (
-		TARGET_DIR  CHAR(35),
-		DATE  CHAR(10),
-		SIZE  INT
+	#create table rows. FILENAME (15), date (char 10), FILETYPE (char 10), size (int)
+	cursor.execute("""CREATE TABLE IF NOT EXISTS """ + dbname + """.backups (
+		FILENAME  VARCHAR(15),
+		DATE  VARCHAR(15),
+		FILETYPE  VARCHAR(10),
+		FILESIZE  INT
 	)""")
+	db.commit()
+	cursor.close()
 
-def insert_tb(user, password, target, date, size):
+def insert_tb(user, password, filename, date, filetype, filesize):
 	db = pymysql.connect("localhost", user, password)
 	cursor = db.cursor()
-	cursor.execute("""INSERT INTO pycryption.backups (TARGET_DIR, DATE, SIZE) VALUES (""" + target + """, """ + date + """, """ + size + """)""")
+	use = "USE " + dbname + ";"
+	insert = "INSERT INTO backups (FILENAME, DATE, FILETYPE, FILESIZE) VALUES (\"{}\", \"{}\", \"{}\", \"{}\");".format(filename, date, filetype, str(filesize))
+	check = "SELECT * FROM backups;"
+	cursor.execute(use)
+	cursor.execute(insert)
+	cursor.execute(check)
+	rows = cursor.fetchall()
+	for row in rows:
+		print(row)
+	db.commit()
+	cursor.close()
+
+def remove_tb(user, password, date):
+	db = pymysql.connect("localhost", user, password)
+	cursor = db.cursor()
+	use = "USE " + dbname + ";"
 	
 #Download gpg installer to cwd
 if args.gpg and sys.platform == "win32":
@@ -86,9 +108,9 @@ if args.gpg and sys.platform == "win32":
 	else:
 		sys.exit()
 
-#Directory + compression arg
-
-elif args.directory and args.compression and args.compression > -1 and args.compression < 10 and args.user and args.password:
+#Add new backup to database using directory + compression arg
+elif args.add and args.directory and args.compression and args.compression > -1 and args.compression < 10 and args.user and args.password:
+	print("Adding a new backup!")
 
 	create_db(args.user, args.password)
 	create_tb(args.user, args.password)
@@ -141,6 +163,7 @@ elif args.directory and args.compression and args.compression > -1 and args.comp
 		#GPG --- C:\Users\Alex>gpg --sign --passphrase --symmetric --cipher-algo AES256 C:\Users\Alex\Desktop\pycryption\Tor-Browser-2018-11-23.zip
 		print("Encrypting the zip file...")
 		proc = subprocess.Popen(['gpg','--sign','--passphrase','--symmetric','--cipher-algo','AES256',zip_file])
+		print("Encryption successful!")
 		#if the process fails then terminate it
 		proc.communicate()[0]
 		proc.returncode
@@ -155,23 +178,33 @@ elif args.directory and args.compression and args.compression > -1 and args.comp
 
 	#Get the size of the gpg file in MB
 	size = os.path.getsize(gpg_file)
-	zip_size=(size << 20)
+	filesize=(size>>20)	
 
 	#Extract the gpg file name from the full path
-	gpg_filename = re.search(r'\bTor\b-\bBrowser\b-\d\d\d\d-\d\d-\d\d.\bzip\b.\bgpg\b', gpg_file).group()
+	filename = re.search(r'\bTor\b-\bBrowser\b', gpg_file).group()
+	filetype = re.search(r'.\bzip\b.\bgpg\b', gpg_file).group()
 	
-	print(gpg_file)
-	print(gpg_filename)
-	print(type(gpg_filename))
-	#Get the GPG file
-	#Needed: insert_tb(args.user, args.password, gpg_filename, currdate, zip_size)
+	print("Added to torsync database:\n   Filename: " + filename + "\n   Date: " + currdate + "\n   Filetype: " + filetype + "\n   Size: " + str(filesize))
 
-	print("Encryption successful!")
+	#Get the GPG file
+	print(filesize)
+	insert_tb(args.user, args.password, filename, currdate, filetype, filesize)
+
+	print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression 8 (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --user 'your_mysql_username' --password 'your_mysql_password' --remove --date 2018-12-26")
 	sys.exit()
 
-else:
+elif args.remove and args.user and args.password and args.date:
 
-	print("Please provide arguments correctly!\nExample:\n --directory A:\\Your\\target\\directory --compression 8 (1-9) --user 'your_mysql_username' --password 'your_mysql_password'")
+	print("Removing a backup!")
+	supplied = args.date
+	if bool(re.match(r'\d\d\d\d-\d\d-\d\d', supplied)) == True:
+		print("We have a match!")
+		#remove_tb(args.user, args.password, args.date)
+	else:
+		err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression 8 (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --user 'your_mysql_username' --password 'your_mysql_password' --remove --date 2018-12-26")
+		sys.exit()
+else:
+	err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression 8 (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --user 'your_mysql_username' --password 'your_mysql_password' --remove --date 2018-12-26")
 	sys.exit()
 
 '''print("File encrypted!")
