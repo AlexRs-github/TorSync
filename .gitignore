@@ -1,7 +1,7 @@
 #My Project's ignored files/folders
 
 /backups
-.vscode
+/.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
