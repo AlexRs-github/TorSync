@@ -208,6 +208,7 @@ elif args.remove and args.user and args.password and args.date:
 	supplied = args.date
 	if bool(re.match(r'\d\d\d\d-\d\d-\d\d', supplied)) == True:
 		dir = os.chdir(os.getcwd() + "/backups")
+		#fix nonetype error caused by ln 212
 		fullpath = dir + "Tor-Browser-" + supplied + ".zip.gpg"
 		remove_tb(args.user, args.password, args.date)
 		#Delete file 
