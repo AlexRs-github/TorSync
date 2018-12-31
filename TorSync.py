@@ -29,13 +29,14 @@ group.add_argument("-r","--remove", action="store_true", help="Remove a backup f
 args = parser.parse_args()
 
 dir = args.directory
-compression = args.compression
-currdate = "-" + str(datetime.datetime.today().strftime('%Y-%m-%d'))
-
-#put gnupg download in cwd
-gnupg_dir = (os.getcwd() + ("\gnupg-w32-2.2.11_20181106.exe"))
 db = "torsync"
 tb = "backups"
+
+#Get the current date
+currdate = "-" + str(datetime.datetime.today().strftime('%Y-%m-%d'))
+
+#Gather where to put the GnuPG download
+gnupg_dir = (os.getcwd() + (r"\gnupg-w32-2.2.11_20181106.exe"))
 
 def create_db(user, password):
 	dbconn = pymysql.connect("localhost", user, password)
@@ -78,11 +79,7 @@ def remove_tb(user, password, date):
 	dbconn = pymysql.connect("localhost", user, password, db = "torsync")
 	cursor = dbconn.cursor()
 	delete = "DELETE FROM " + tb + " WHERE Date = '-" + date + "';"
-	#cursor.execute(use)
 	cursor.execute(delete)
-	rows = cursor.fetchall()
-	for row in rows:
-		print(row)
 	dbconn.commit()
 	cursor.close()
 	
@@ -159,22 +156,30 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 	#Zip up entire target directory
 	def zip_directory(zip_file, dir):
 		print("Zipping the target directory...")
-		zip = zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED, compresslevel=compression)
+		zip = zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED, compresslevel = args.compression)
 
 		for dirname, subdirs, files in os.walk(dir):
 			zip.write(dirname)
 			for filename in files:
 					zip.write(os.path.join(dirname, filename))
-		zip.close()
 
-	print("Tor Browser backup zipped successfully!")
+		print("Tor Browser backup zipped successfully!")
+		zip.close()
 
 	#Encrypt file using GPG
 	def aes_encrypt(zip_file):
 		
 		#GPG --- C:\Users\Alex>gpg --sign --passphrase --symmetric --cipher-algo AES256 C:\Users\Alex\Desktop\pycryption\Tor-Browser-2018-11-23.zip
 		print("Encrypting the zip file...")
-		subprocess.Popen(['gpg', '--sign', '--passphrase', '--symmetric', '--cipher-algo', 'AES256', zip_file])
+		proc = subprocess.Popen(['gpg', '--sign', '--passphrase', '--symmetric', '--cipher-algo', 'AES256', zip_file])
+		proc.communicate()[0]
+		proc.returncode
+		print(proc.returncode)
+		print(type(proc.returncode))
+		if proc == 1:
+			proc.terminate()
+			sys.exit()
+
 		print("Encryption successful!")
 	
 	zip_directory(zip_file, dir)
