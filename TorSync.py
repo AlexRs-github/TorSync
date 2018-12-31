@@ -75,11 +75,10 @@ def insert_tb(user, password, filename, date, filetype, filesize):
 	cursor.close()
 
 def remove_tb(user, password, date):
-	dbconn = pymysql.connect("localhost", user, password)
+	dbconn = pymysql.connect("localhost", user, password, db = "torsync")
 	cursor = dbconn.cursor()
-	use = "USE " + db + ";"
-	delete = "DELETE FROM " + tb + " WHERE Date = " + date + ";"
-	cursor.execute(use)
+	delete = "DELETE FROM " + tb + " WHERE Date = '-" + date + "';"
+	#cursor.execute(use)
 	cursor.execute(delete)
 	rows = cursor.fetchall()
 	for row in rows:
@@ -160,7 +159,7 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 	#Zip up entire target directory
 	def zip_directory(zip_file, dir):
 		print("Zipping the target directory...")
-		zip = zipfile.ZipFile(zip_file,'w',zipfile.ZIP_DEFLATED,compresslevel=compression)
+		zip = zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED, compresslevel=compression)
 
 		for dirname, subdirs, files in os.walk(dir):
 			zip.write(dirname)
@@ -175,14 +174,8 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 		
 		#GPG --- C:\Users\Alex>gpg --sign --passphrase --symmetric --cipher-algo AES256 C:\Users\Alex\Desktop\pycryption\Tor-Browser-2018-11-23.zip
 		print("Encrypting the zip file...")
-		proc = subprocess.Popen(['gpg','--sign','--passphrase','--symmetric','--cipher-algo','AES256',zip_file])
+		subprocess.Popen(['gpg', '--sign', '--passphrase', '--symmetric', '--cipher-algo', 'AES256', zip_file])
 		print("Encryption successful!")
-		#if the process fails then terminate it
-		proc.communicate()[0]
-		proc.returncode
-		if proc == 1:
-			proc.terminate()
-			sys.exit()
 	
 	zip_directory(zip_file, dir)
 	aes_encrypt(zip_file)
@@ -190,9 +183,13 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 	shutil.rmtree(bkdir)
 
 	#Get the size of the gpg file in MB
-	size = os.path.getsize(gpg_file)
-	filesize=(size>>20)	
-
+	try:
+		size = os.path.getsize(gpg_file)
+		filesize = (size >> 20)
+	except FileNotFoundError as e:
+		print("Encrypted zip file could not be found!\n   Exiting...")
+		sys.exit()
+	
 	#Extract the gpg file name from the full path
 	filename = re.search(r'\bTor\b-\bBrowser\b', gpg_file).group()
 	filetype = re.search(r'.\bzip\b.\bgpg\b', gpg_file).group()
@@ -200,26 +197,28 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 	#Get the GPG file
 	print(filesize)
 	insert_tb(args.user, args.password, filename, currdate, filetype, filesize)
-
+	
+	#Exit when finished
 	sys.exit()
 
 elif args.remove and args.user and args.password and args.date:
-	print("Removing a backup!")
+	print("Removing backup!")
 	supplied = args.date
 	if bool(re.match(r'\d\d\d\d-\d\d-\d\d', supplied)) == True:
-		dir = os.chdir(os.getcwd() + "/backups")
-		#fix nonetype error caused by ln 212
+		dir = os.getcwd() + "/backups/"
+		os.chdir(dir)
 		fullpath = dir + "Tor-Browser-" + supplied + ".zip.gpg"
-		remove_tb(args.user, args.password, args.date)
-		#Delete file 
-		for file in os.listdir():
-			if file == fullpath:
-				os.remove(fullpath)
+		try:
+			os.remove(str(fullpath))
+			remove_tb(args.user, args.password, args.date)
+		except IOError as e:
+			print("File does not exist in backups directory!\n   Exiting...")
+			sys.exit()
 	else:
-		err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26")
+		err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
 		sys.exit()
 else:
-	err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26")
+	err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
 	sys.exit()
 
 '''print("File encrypted!")
