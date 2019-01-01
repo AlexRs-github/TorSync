@@ -36,7 +36,6 @@ currdate = "-" + str(datetime.datetime.today().strftime('%Y-%m-%d'))
 gnupg_dir = (os.getcwd() + ("\gnupg-w32-2.2.11_20181106.exe"))
 db = "torsync"
 tb = "backups"
-tb_gpg = "gpg"
 
 def create_db(user, password):
 	dbconn = pymysql.connect("localhost", user, password)
@@ -56,20 +55,6 @@ def create_tb(user, password):
 		Date  VARCHAR(15),
 		Filetype  VARCHAR(10),
 		Filesize  INT
-	)""")
-	dbconn.commit()
-	cursor.close()
-
-def create_tb_gpg(user,password):
-	dbconn = pymysql.connect("localhost", user, password)
-	cursor = dbconn.cursor()
-	#create gpg table
-	#create table fields & rows.
-	cursor.execute("""CREATE TABLE IF NOT EXISTS """ + db + """.""" + tb_gpg + """ (
-		Filename  VARCHAR(15),
-		Version VARCHAR(15),
-		Date  VARCHAR(15),
-		Filetype  VARCHAR(10),
 	)""")
 	dbconn.commit()
 	cursor.close()
@@ -102,7 +87,7 @@ def remove_tb(user, password, date):
 	cursor.close()
 	
 #Download gpg installer to cwd
-if args.gpg and sys.platform == "win32":
+if args.gpg and args.user and args.password and sys.platform == "win32":
 
 	gnupg_url_win = "https://www.gnupg.org/ftp/gcrypt/binary/gnupg-w32-2.2.11_20181106.exe"
 	gnupg_win = urllib.request.urlretrieve(gnupg_url_win, gnupg_dir)
