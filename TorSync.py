@@ -67,9 +67,9 @@ def create_tb_gpg(user,password):
 	#create table fields & rows.
 	cursor.execute("""CREATE TABLE IF NOT EXISTS """ + db + """.""" + tb_gpg + """ (
 		Filename  VARCHAR(15),
+		Version VARCHAR(15),
 		Date  VARCHAR(15),
 		Filetype  VARCHAR(10),
-		Filesize  INT
 	)""")
 	dbconn.commit()
 	cursor.close()
