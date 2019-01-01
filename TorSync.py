@@ -36,6 +36,7 @@ currdate = "-" + str(datetime.datetime.today().strftime('%Y-%m-%d'))
 gnupg_dir = (os.getcwd() + ("\gnupg-w32-2.2.11_20181106.exe"))
 db = "torsync"
 tb = "backups"
+tb_gpg = "gpg"
 
 def create_db(user, password):
 	dbconn = pymysql.connect("localhost", user, password)
@@ -49,8 +50,22 @@ def create_tb(user, password):
 	dbconn = pymysql.connect("localhost", user, password)
 	cursor = dbconn.cursor()
 	#create backups table
-	#create table rows. Filename (15), date (char 10), Filetype (char 10), Filesize (int)
+	#create table fields & rows. Filename (15), date (char 10), Filetype (char 10), Filesize (int)
 	cursor.execute("""CREATE TABLE IF NOT EXISTS """ + db + """.""" + tb + """ (
+		Filename  VARCHAR(15),
+		Date  VARCHAR(15),
+		Filetype  VARCHAR(10),
+		Filesize  INT
+	)""")
+	dbconn.commit()
+	cursor.close()
+
+def create_tb_gpg(user,password):
+	dbconn = pymysql.connect("localhost", user, password)
+	cursor = dbconn.cursor()
+	#create gpg table
+	#create table fields & rows.
+	cursor.execute("""CREATE TABLE IF NOT EXISTS """ + db + """.""" + tb_gpg + """ (
 		Filename  VARCHAR(15),
 		Date  VARCHAR(15),
 		Filetype  VARCHAR(10),
