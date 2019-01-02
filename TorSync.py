@@ -1,6 +1,4 @@
-import pymysql, subprocess, argparse, shutil, os, ctypes, sys, zipfile, pywinauto, urllib, re, datetime, time
-from urllib import request
-from pywinauto import Application
+import pymysql, subprocess, argparse, shutil, os, sys, zipfile, requests, re, datetime, time
 from sys import platform
 from pathlib import Path
 
@@ -50,7 +48,7 @@ def create_tb(user, password):
 	dbconn = pymysql.connect("localhost", user, password)
 	cursor = dbconn.cursor()
 	#create backups table
-	#create table rows. Filename (15), date (char 10), Filetype (char 10), Filesize (int)
+	#create table fields & rows. Filename (15), date (char 10), Filetype (char 10), Filesize (int)
 	cursor.execute("""CREATE TABLE IF NOT EXISTS """ + db + """.""" + tb + """ (
 		Filename  VARCHAR(15),
 		Date  VARCHAR(15),
@@ -86,35 +84,46 @@ def remove_tb(user, password, date):
 #Download gpg installer to cwd
 if args.gpg and sys.platform == "win32":
 
-	gnupg_url_win = "https://www.gnupg.org/ftp/gcrypt/binary/gnupg-w32-2.2.11_20181106.exe"
-	gnupg_win = urllib.request.urlretrieve(gnupg_url_win, gnupg_dir)
+	html = requests.get("https://www.gnupg.org/download/")
 
-	args.gpg = gnupg_win
+	#Request has been successful
+	if html.status_code == 200:
 
-	#execute gnupg setup with proper privileges
-	proc = subprocess.Popen([args.gpg], shell=True)
-	proc.communicate()[0]
+		html = requests.get("https://www.gnupg.org/download/").text
+		ftp = re.search(r'\bftp\b/\bgcrypt/\bbinary/\bgnupg\b-\bw32-\d+.\d+.\d+_\d+.\bexe\b', html).group()
+		filename = re.search(r'\bgnupg\b-\bw32-\d+.\d+.\d+_\d+.\bexe\b', html).group()
+		url = "https://www.gnupg.org/" + ftp
+		dwnld = requests.get(url)
 
-	if proc.returncode == 1:
+		#Download latest GnuPG for w32
+		request = open(filename, 'wb').write(dwnld.content)
 
-		print("gpg on Windows!")
-
-		#os.environ.update({"__COMPAT_LAYER":"RunAsInvoker"})
-		
-		#gnupg = Application().start(args.gpg)
-		#w_handle = pywinauto.findwindows.find_windows(title=u'Installer Language', class_name='#32770')[0]
-		#window = gnupg.window(handle=w_handle)
-		#window.set_focus()
-		#ctrl = window['&Next >']
-		#ctrl.click_input()
-		time.sleep(3)
-		gnupg_setup = pywinauto.application.Application()
-		pwa_app = pywinauto.application.Application()
-		w_handle = pywinauto.findwindows.find_windows(title=u'GNU Privacy Guard Setup', class_name='#32770')[0]
-		window = gnupg_setup.window_(handle=w_handle)
-		window.SetFocus()
-	
 	else:
+		print("Could not find download url! Exiting...")
+		sys.exit()
+
+elif args.gpg and sys.platform == "linux":
+	
+	print("GnuPG comes installed on linux!")
+	sys.exit()
+
+elif args.gpg and sys.platform == "darwin":
+	
+	html = requests.get("https://sourceforge.net/p/gpgosx/docu/Download/")
+
+	if html.status_code == 200:
+
+		html = requests.get("https://sourceforge.net/p/gpgosx/docu/Download/").text
+		ftp = re.search(r'\bprojects\b/\bgpgosx\b/\bfiles\b/\bGnuPG.\d+.\d+.\d+.\bdmg\b/\bdownload\b', html).group()
+		filename = re.search(r'\bGnuPG.\d+.\d+.\d+.\bdmg\b/\bdownload\b', html).group()
+		url = "https://sourceforge.net/" + ftp
+		dwnld = requests.get(url)
+
+		#Download gpgosx for MacOS
+		request = open(filename, 'wb').write(dwnld.content)
+
+	else:
+		print("Could not find download url! Exiting...")
 		sys.exit()
 
 #Add new backup to database using directory + compression arg
@@ -220,10 +229,10 @@ elif args.remove and args.user and args.password and args.date:
 			print("File does not exist in backups directory!\n   Exiting...")
 			sys.exit()
 	else:
-		err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
+		err = print("Please provide arguments correctly!\nExample (1):\n   --gpg\nExample (2):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (3):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
 		sys.exit()
 else:
-	err = print("Please provide arguments correctly!\nExample (1):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (2):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
+	err = print("Please provide arguments correctly!\nExample (1):\n   --gpg\nExample (2):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (3):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
 	sys.exit()
 
 '''print("File encrypted!")
