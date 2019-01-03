@@ -10,14 +10,19 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-g","--gpg", action="store_true", help="Download gpg windows installer to cwd")
 
-#Commands to remove backups
-parser.add_argument("-t","--date", type=str, help="Supply a backup by date that you want to remove")
+#Command to reference backups
+parser.add_argument("-t","--date", type=str, help="Reference a backup by date")
 
-#Commands to add backups
+#Commands for a backup's directory/compression
 parser.add_argument("-d","--directory", type=str, help="Target directory you want to encrypt & backup")
 parser.add_argument("-c","--compression", type=int, help="Specify the level of compression you want")
+
+#Commands for MySql user/password
 parser.add_argument("-u","--user", type=str, help="Username for MySQL")
 parser.add_argument("-p","--password", type=str, help="Password for MySQL")
+
+#Command to decrypt backup
+parser.add_argument("-dec","--decrypt", action="store_true", help="Decrypt a backup")
 
 #Mutually Exclusive
 group = parser.add_mutually_exclusive_group()
@@ -32,9 +37,6 @@ tb = "backups"
 
 #Get the current date
 currdate = "-" + str(datetime.datetime.today().strftime('%Y-%m-%d'))
-
-#Gather where to put the GnuPG download
-gnupg_dir = (os.getcwd() + (r"\gnupg-w32-2.2.11_20181106.exe"))
 
 def create_db(user, password):
 	dbconn = pymysql.connect("localhost", user, password)
@@ -59,12 +61,10 @@ def create_tb(user, password):
 	cursor.close()
 
 def insert_tb(user, password, filename, date, filetype, filesize):
-	dbconn = pymysql.connect("localhost", user, password)
+	dbconn = pymysql.connect("localhost", user, password, db = db)
 	cursor = dbconn.cursor()
-	use = "USE " + db + ";"
 	insert = "INSERT INTO " + tb + " (Filename, Date, Filetype, Filesize) VALUES (\"{}\", \"{}\", \"{}\", \"{}\");".format(filename, date, filetype, str(filesize))
 	check = "SELECT * FROM " + tb + ";"
-	cursor.execute(use)
 	cursor.execute(insert)
 	cursor.execute(check)
 	rows = cursor.fetchall()
@@ -74,13 +74,23 @@ def insert_tb(user, password, filename, date, filetype, filesize):
 	cursor.close()
 
 def remove_tb(user, password, date):
-	dbconn = pymysql.connect("localhost", user, password, db = "torsync")
+	dbconn = pymysql.connect("localhost", user, password, db = db)
 	cursor = dbconn.cursor()
 	delete = "DELETE FROM " + tb + " WHERE Date = '-" + date + "';"
 	cursor.execute(delete)
 	dbconn.commit()
 	cursor.close()
 	
+def select_row(user, password, date):
+	dbconn = pymysql.connect("localhost", user, password, db = db)
+	cursor = dbconn.cursor()
+	select = "SELECT * FROM " + tb + " WHERE Date = '-" + date + "';"
+	cursor.execute(select)
+	fields = cursor.fetchone()
+	select_row.row = (fields[0] + fields[1] + fields[2])
+	dbconn.commit()
+	cursor.close()
+
 #Download gpg installer to cwd
 if args.gpg and sys.platform == "win32":
 
@@ -119,7 +129,7 @@ elif args.gpg and sys.platform == "darwin":
 		url = "https://sourceforge.net/" + ftp
 		dwnld = requests.get(url)
 
-		#Download gpgosx for MacOS
+		#Download GPG DMG for MacOS
 		request = open(filename, 'wb').write(dwnld.content)
 
 	else:
@@ -138,7 +148,6 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 	#Handle duplicate files and folders
 	if os.path.isdir(bkdir) == True:
 		shutil.rmtree(bkdir)
-
 	try:
 		dir = shutil.copytree(dir, bkdir)
 	except IOError as e:
@@ -183,12 +192,9 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 		proc = subprocess.Popen(['gpg', '--sign', '--passphrase', '--symmetric', '--cipher-algo', 'AES256', zip_file])
 		proc.communicate()[0]
 		proc.returncode
-		print(proc.returncode)
-		print(type(proc.returncode))
 		if proc == 1:
 			proc.terminate()
 			sys.exit()
-
 		print("Encryption successful!")
 	
 	zip_directory(zip_file, dir)
@@ -218,7 +224,7 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 elif args.remove and args.user and args.password and args.date:
 	print("Removing backup!")
 	supplied = args.date
-	if bool(re.match(r'\d\d\d\d-\d\d-\d\d', supplied)) == True:
+	if bool(re.match(r'\d+-\d+-\d+', supplied)) == True:
 		dir = os.getcwd() + "/backups/"
 		os.chdir(dir)
 		fullpath = dir + "Tor-Browser-" + supplied + ".zip.gpg"
@@ -231,21 +237,34 @@ elif args.remove and args.user and args.password and args.date:
 	else:
 		err = print("Please provide arguments correctly!\nExample (1):\n   --gpg\nExample (2):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (3):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
 		sys.exit()
+
+elif args.decrypt and args.user and args.password and args.date:
+
+	select_row(args.user, args.password, args.date)
+
+	#Call row from outside select_row function
+	backup = select_row.row
+	backups = os.getcwd() + "/backups/" + backup
+
+	#C:\Users\Alex\Desktop\TorSync/backups/Tor-Browser-2018-12-30.zip.gpg
+	zip_name = re.search(r'\bTor\b-\bBrowser\b-\d+-\d+-\d+.\bzip\b',backups).group()
+	zip = os.getcwd() + "/backups/" + zip_name
+
+	if os.path.isfile(backups):
+		def aes_decrypt(zip_file,enc_file):
+			print("Decrypting the zip file...")
+			proc = subprocess.Popen(['gpg','--output',zip_file,'--decrypt',enc_file])
+			proc.communicate()[0]
+			proc.returncode
+			if proc == 1:
+				proc.terminate()
+				sys.exit()
+			print("Decryption Successful!")
+		aes_decrypt(zip,backups)
+	else:
+		print("Could not find file specified!\n   Exiting...")
+		sys.exit()
+
 else:
 	err = print("Please provide arguments correctly!\nExample (1):\n   --gpg\nExample (2):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (3):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
 	sys.exit()
-
-'''print("File encrypted!")
-time.sleep(5)
-print("Decrypting now...")
-
-enc_zip = (zip_name + '.gpg')
-
-decrypt file takes in new gpg file and output file as parameters
-def aes_decrypt(enc_zip,zip_name):
-	subprocess.run(['gpg','--output',file,'--decrypt',zip_name])
-	
-aes_decrypt(file)
-
-print("Decrypting complete!")'''
-
