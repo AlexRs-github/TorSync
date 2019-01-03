@@ -4,6 +4,7 @@ from pathlib import Path
 
 #Example Tor Browser target directory:
 #   A:\\Tor' 'Browser' 'x64\\Tor' 'Browser
+#   //mnt//a//Tor' 'Browser' 'x64//Tor' 'Browser 
 
 #Args
 parser = argparse.ArgumentParser()
@@ -137,7 +138,7 @@ elif args.gpg and sys.platform == "darwin":
 		sys.exit()
 
 #Add new backup to database using directory + compression arg
-elif args.add and args.directory and args.compression and args.compression > -1 and args.compression < 10 and args.user and args.password:
+elif args.add and args.directory and args.user and args.password:
 	print("Adding a new backup!")
 
 	create_db(args.user, args.password)
@@ -174,7 +175,7 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 	#Zip up entire target directory
 	def zip_directory(zip_file, dir):
 		print("Zipping the target directory...")
-		zip = zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED, compresslevel = args.compression)
+		zip = zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED, compresslevel = 9)
 
 		for dirname, subdirs, files in os.walk(dir):
 			zip.write(dirname)
@@ -223,20 +224,33 @@ elif args.add and args.directory and args.compression and args.compression > -1 
 
 elif args.remove and args.user and args.password and args.date:
 	print("Removing backup!")
-	supplied = args.date
-	if bool(re.match(r'\d+-\d+-\d+', supplied)) == True:
+	date = args.date
+	if bool(re.match(r'\d+-\d+-\d+', date)) == True:
 		dir = os.getcwd() + "/backups/"
 		os.chdir(dir)
-		fullpath = dir + "Tor-Browser-" + supplied + ".zip.gpg"
+		full_path = dir + "Tor-Browser-" + date + ".zip.gpg"
+		part_path = dir + "Tor-Browser-" + date + ".zip"
+		folder = dir + "Tor-Browser-" + date
 		try:
-			os.remove(str(fullpath))
+			shutil.rmtree(folder)
+			os.remove(str(part_path)
+			os.remove(str(full_path))
 			remove_tb(args.user, args.password, args.date)
 		except IOError as e:
 			print("File does not exist in backups directory!\n   Exiting...")
 			sys.exit()
 	else:
-		err = print("Please provide arguments correctly!\nExample (1):\n   --gpg\nExample (2):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (3):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
-		sys.exit()
+		print("""Please provide arguments correctly!
+	Example (1):
+	   --gpg
+	Example (2):
+	   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'
+	Example (3):
+	   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date YYYY-MM-DD
+	Example (4):
+	   --decrypt --user 'your_mysql_username' --password 'your_mysql_password' --date YYYY-MM-DD
+	Exiting...""")
+	sys.exit()
 
 elif args.decrypt and args.user and args.password and args.date:
 
@@ -266,5 +280,14 @@ elif args.decrypt and args.user and args.password and args.date:
 		sys.exit()
 
 else:
-	err = print("Please provide arguments correctly!\nExample (1):\n   --gpg\nExample (2):\n   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'\nExample (3):\n   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date 2018-12-26\n   Exiting...")
+	print("""Please provide arguments correctly!
+	Example (1):
+	   --gpg
+	Example (2):
+	   --add --directory A:\\Your\\target\\directory --compression (1-9) --user 'your_mysql_username' --password 'your_mysql_password'
+	Example (3):
+	   --remove --user 'your_mysql_username' --password 'your_mysql_password' --date YYYY-MM-DD
+	Example (4):
+	   --decrypt --user 'your_mysql_username' --password 'your_mysql_password' --date YYYY-MM-DD
+	Exiting...""")
 	sys.exit()
